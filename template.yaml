@@ -1,0 +1,179 @@
+# This is the SAM template that represents the architecture of your serverless application
+# https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-template-basics.html
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: Autodesk Platform Services application built using AWS serverless.
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  ClientID:
+    Type: String
+    Description: APS application client ID.
+    Default: ""
+  ClientSecret:
+    Type: String
+    Description: APS application client secret.
+    Default: ""
+
+Globals:
+  Function:
+    Runtime: nodejs18.x
+    Timeout: 600
+    MemorySize: 1024
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        APS_CLIENT_ID: !Ref ClientID
+        APS_CLIENT_SECRET: !Ref ClientSecret
+
+Resources:
+  ApiGatewayApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Cors:
+        AllowMethods: "'OPTIONS, POST, GET'"
+        AllowHeaders: "'Content-Type'"
+        AllowOrigin: "'*'" # DO NOT USE THIS VALUE IN PRODUCTION - https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-cors.html
+
+  getAccessTokenFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/
+      Handler: src/handlers/get-access-token.getAccessToken
+      Description: Generates an access token for previewing designs in the viewer.
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /token
+            Method: GET
+            RestApiId:
+              Ref: ApiGatewayApi
+
+  getDesignsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/
+      Handler: src/handlers/get-designs.getDesigns
+      Description: Lists all designs stored by the application.
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /designs
+            Method: GET
+            RestApiId:
+              Ref: ApiGatewayApi
+
+  createDesignFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/
+      Handler: src/handlers/create-design.createDesign
+      Description: Creates new design and provides an upload URL for it.
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /designs
+            Method: POST
+            RestApiId:
+              Ref: ApiGatewayApi
+
+  getDesignStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/
+      Handler: src/handlers/get-design-status.getDesignStatus
+      Description: Returns status of derivative extraction for specific design.
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /designs/{urn}/status
+            Method: GET
+            RestApiId:
+              Ref: ApiGatewayApi
+
+  WebSiteBucket:
+    Type: "AWS::S3::Bucket"
+
+  WebSiteBucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Ref WebSiteBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Id: "PolicyForCloudFrontPrivateContent"
+        Statement:
+        - Sid: "AllowCloudFrontServicePrincipal"
+          Effect: "Allow"
+          Principal:
+            Service: "cloudfront.amazonaws.com"
+          Action: "s3:GetObject"
+          Resource: !Join [ "", [ "arn:aws:s3:::", !Ref WebSiteBucket, "/*" ] ]
+          Condition:
+            StringEquals:
+              "AWS:SourceArn": !Join [ "", [ "arn:aws:cloudfront::", !Ref "AWS::AccountId", ":distribution/", !Ref CloudFrontDistribution ] ]
+
+  CloudFrontDistribution:
+    Type: "AWS::CloudFront::Distribution"
+    Properties:
+      DistributionConfig:
+        Origins:
+        - DomainName: !GetAtt WebSiteBucket.RegionalDomainName
+          Id: "myS3Origin"
+          OriginAccessControlId: !GetAtt CloudFrontOriginAccessControl.Id
+          S3OriginConfig: 
+            OriginAccessIdentity: ""
+        Enabled: true
+        DefaultRootObject: "index.html"
+        HttpVersion: "http2"
+        DefaultCacheBehavior:
+          AllowedMethods:
+          - "DELETE"
+          - "GET"
+          - "HEAD"
+          - "OPTIONS"
+          - "PATCH"
+          - "POST"
+          - "PUT"
+          CachedMethods:
+          - "GET"
+          - "HEAD"
+          TargetOriginId: "myS3Origin"
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: "none"
+          ViewerProtocolPolicy: "allow-all"
+          MinTTL: 0
+          DefaultTTL: 3600
+          MaxTTL: 86400
+        PriceClass: "PriceClass_200"
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+  CloudFrontOriginAccessControl:
+    Type: "AWS::CloudFront::OriginAccessControl"
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${WebSiteBucket} OAC"
+        OriginAccessControlOriginType: "s3"
+        SigningBehavior: "always"
+        SigningProtocol: "sigv4"
+
+Outputs:
+  APIGatewayEndpoint:
+    Description: "API Gateway endpoint URL for Prod stage"
+    Value: !Sub "https://${ApiGatewayApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+  CloudFrontDistributionId:
+    Description: "CloudFront Distribution ID for hosting web front end"
+    Value: !Ref CloudFrontDistribution
+  CloudFrontDistributionDomainName:
+    Description: "CloudFront Distribution Domain Name for accessing web front end"
+    Value: !GetAtt CloudFrontDistribution.DomainName
+  WebS3BucketName:
+    Description: "S3 Bucket for hosting web frontend"
+    Value: !Ref WebSiteBucket
