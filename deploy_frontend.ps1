@@ -19,14 +19,19 @@ Write-Host "S3 Bucket Name: $s3_bucket_name"
 cd frontend/
 
 # Add the API Gateway endpoint to the config file
-"`nexport const API_ENDPOINT = \"$api_gateway_endpoint\"" | Out-File "config.js"
+"{ \"API_ENDPOINT\": \"$api_gateway_endpoint\" }" | Out-File "config.json"
 
 # Confirm that the endpoint has been added to the config file
 Write-Host "The API Gateway endpoint has been added to the config file:"
-Get-Content "config.js"
+Get-Content "config.json"
+
+# Build frontend code
+Write-Host "Building frontend code"
+yarn run build
 
 # Sync distribution with S3
 Write-Host "Syncing assets"
+cd dist/
 aws s3 sync . "s3://$s3_bucket_name/"
 
 # Create cloudfront invalidation and capture id for next step

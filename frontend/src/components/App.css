@@ -1,0 +1,40 @@
+#header {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 3em;
+    display: flex;
+    flex-flow: row nowrap;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#header > * {
+    margin: 0 0.5em;
+    height: 2em;
+}
+
+#header .title {
+    margin-left: 0.5em;
+    margin-right: auto;
+    height: auto;
+    font-weight: bolder;
+}
+
+#content {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 3em;
+    bottom: 0;
+}
+
+#overlay {
+    position: absolute;
+    inset: 25%;
+    background-color: rgba(255, 255, 255, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}

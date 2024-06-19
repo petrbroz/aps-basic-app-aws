@@ -390,7 +390,7 @@ $RECYCLE.BIN/
 # End of https://www.toptal.com/developers/gitignore/api/osx,sam,linux,python,windows,node
 
 # Deployment artifacts
-frontend/config.js
+frontend/config.json
 
 # Local configuration
 env.json

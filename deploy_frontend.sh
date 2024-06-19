@@ -21,14 +21,19 @@ echo "S3 Bucket Name: $s3_bucket_name"
 cd frontend/
 
 # Add the API Gateway endpoint to the config file
-echo "export const API_ENDPOINT = \"$api_gateway_endpoint\"" > config.js
+echo "{ \"API_ENDPOINT\": \"$api_gateway_endpoint\" }" > config.json
 
 # Confirm that the endpoint has been added to the config file
 echo "The API Gateway endpoint has been added to the config file:"
-cat config.js
+cat config.json
+
+# Build frontend code
+echo "Building frontend code"
+yarn run build
 
 # Sync distribution with S3
 echo "Syncing assets"
+cd dist/
 aws s3 sync . s3://$s3_bucket_name/
 
 # Create cloudfront invalidation and capture id for next step
